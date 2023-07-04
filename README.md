@@ -1,7 +1,7 @@
 # News_Crawler
 This crawler will get news data from chihuahua's news papers
 
-The following web sites will be scraped scrapy in this project:
+The following web sites will be scraped using scrapy for this project:
 
 *    [El diario chihuahua](https://www.eldiariodechihuahua.mx/)
 *    [Tiempo](https://www.tiempo.com.mx/)
