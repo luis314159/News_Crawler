@@ -14,14 +14,14 @@ from selenium.webdriver.support.expected_conditions import staleness_of
 class diarioCrawler(scrapy.Spider):
     name = "diarioCrawler"
     allowed_domains = ["eldiariodechihuahua.mx"]
-    start_urls = ["https://www.eldiariodechihuahua.mx/seccion/Local/"]
+    start_urls = ["https://www.eldiariodechihuahua.mx/seccion/Local"]
 
     custom_settings = {
         'FEED_URI': 'DiarioChihuahua.csv',
         'FEED_FORMAT': 'csv',
         'FEED_EXPORT_ENCODING': 'utf-8',
         'DEPTH_LIMIT': 20,
-        'CONCURRENT_REQUESTS': 70,
+        'CONCURRENT_REQUESTS': 30,
         'MEMUSAGE_NOTIFY_MAIL': ['luis3.14xbox@live.com'],
         'ROBOTSTXT_OBEY': True,
         'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.3'
@@ -33,7 +33,7 @@ class diarioCrawler(scrapy.Spider):
     def parse(self, response):
         self.driver.get(response.url)
         n = 0 # Number of clicks in the button
-        limit = 5 # Limit of number of clicks
+        limit = 1000000 # Limit of number of clicks
         sel = None
         try:
             while n < limit:
