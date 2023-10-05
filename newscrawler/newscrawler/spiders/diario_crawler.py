@@ -1,25 +1,13 @@
 import scrapy
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException
-from scrapy.selector import Selector
-from scrapy.http import Request
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from newscrawler.items import DiarioChiItems
-from selenium.webdriver.support.expected_conditions import staleness_of
-from scrapy.spiders import Rule
-from scrapy.linkextractors import LinkExtractor
-import time
+from scrapy.selector import Selector
 
-
+import json
 
 class diarioCrawler(scrapy.Spider):
     name = "diarioCrawler"
     allowed_domains = ["eldiariodechihuahua.mx", "eldiariodedelicias.mx", "eldiariodeparral.mx"]
-    start_urls = ["https://www.eldiariodechihuahua.mx"]
+    start_urls = ["https://www.eldiariodechihuahua.mx"]#, "https://eldiariodedelicias.mx/", "https://eldiariodeparral.mx/"]
     stop_crawling = False
 
     custom_settings = {
@@ -33,15 +21,57 @@ class diarioCrawler(scrapy.Spider):
         'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.3'
     }
 
-    def __init__(self):
-        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-        self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-
     def parse(self, response):
         section_urls = response.css("div.rcx12.menu > div.site-name a::attr(href)").getall()
         for section in section_urls:
-            if ((section  != "https://www.eldiariodechihuahua.mx/seccion/Opinion/") and (section != "https://www.eldiariodechihuahua.mx/clasificado/") and (section != "https://www.eldiariodechihuahua.mx/")):
+            if section not in ["https://www.eldiariodechihuahua.mx/seccion/Opinion/", 
+                               "https://www.eldiariodechihuahua.mx/clasificado/",
+                               "https://www.eldiariodechihuahua.mx/",
+                               "https://eldiariodeparral.mx/seccion/Sociales/",
+                               "https://eldiariodedelicias.mx/seccion/Sociales/"]:
                 yield response.follow(section, callback = self.parse_page)
+
+    def parse_page(self, response):
+        if not self.stop_crawling:
+            page_num = 0  # Starting page
+            section_name = response.url.split('/')[-2]  # Extracting section name from the url
+
+            # Determine the base domain
+            base_domain = response.url.split('/')[2]
+            print(f"Base_domain: {base_domain}")
+            # Use the base domain to construct the AJAX request URL
+            next_url = f"https://{base_domain}/app_config/scroll.php?page={page_num}&cabeza={section_name}"
+
+            yield scrapy.Request(next_url, callback=self.parse_scroll_content, meta={'page_num': page_num, 'section_name': section_name, 'base_response': response, 'base_domain': base_domain})
+
+
+    def parse_scroll_content(self, response):
+        try:
+            # Intenta cargar la respuesta como JSON
+            data = json.loads(response.text)
+            # Aquí puedes extraer los datos específicos del JSON, por ahora simplemente lo imprimiré
+            # para que sepas que tienes que procesar este JSON:
+            #print(data)
+            # Dependiendo de la estructura del JSON, tendrías que extraer los enlaces y otros datos relevantes
+            # Por ejemplo:
+            # links = [item['url'] for item in data['items']]
+        except json.JSONDecodeError:
+            # Si no es JSON, trata la respuesta como HTML
+            sel = Selector(text=response.text)
+            links = sel.css("article a ::attr(href)").getall()
+            for link in links:
+                yield response.follow(url=link, callback=self.parse_item)
+
+        # Check if there's more to scroll
+        if not self.stop_crawling and "content indicating no more data" not in response.text:
+            page_num = response.meta['page_num'] + 1
+            section_name = response.meta['section_name']
+
+            # Use the base domain from meta to construct the AJAX request URL
+            base_domain = response.meta['base_domain']
+            next_url = f"https://{base_domain}/app_config/scroll.php?page={page_num}&cabeza={section_name}"
+
+            yield scrapy.Request(next_url, callback=self.parse_scroll_content, meta={'page_num': page_num, 'section_name': section_name, 'base_response': response, 'base_domain': base_domain})
 
     def parse_item(self, response):
 
@@ -62,31 +92,3 @@ class diarioCrawler(scrapy.Spider):
 
         if not self.stop_crawling:
             yield diario
-
-
-    def parse_page(self, response):
-        if not self.stop_crawling:
-            self.driver.get(response.url)
-            n = 0 # Number of clicks in the button
-            limit = 10000000 # Limit of number of clicks
-            sel = None
-            try:
-                while n < limit and not self.stop_crawling:
-                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(2)
-                    next_button = self.driver.find_element(By.XPATH, '//button[text()="Ver más"]')
-                    next_button.click()
-                    self.log('Clicked on "Ver más" button.')
-                    wait = WebDriverWait(self.driver, 10)
-                    wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Ver más"]')))
-                    sel = Selector(text=self.driver.page_source)
-                    n += 1
-            except NoSuchElementException:
-                self.log('No more pages to load.')
-
-            if sel and not self.stop_crawling:
-                links = sel.css("article a ::attr(href)").getall()
-                for link in links:
-                    yield response.follow(url=link, callback=self.parse_item)
-
-            self.driver.quit()
