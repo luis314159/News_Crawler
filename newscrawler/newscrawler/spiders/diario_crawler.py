@@ -11,7 +11,7 @@ class diarioCrawler(scrapy.Spider):
     stop_crawling = False
 
     custom_settings = {
-        'FEED_URI': 'DiarioChihuahua.csv',
+        'FEED_URI': 'DiarioChihuahua2.csv',
         'FEED_FORMAT': 'csv',
         'FEED_EXPORT_ENCODING': 'utf-8',
         'DEPTH_LIMIT': 100000,
@@ -82,7 +82,8 @@ class diarioCrawler(scrapy.Spider):
         diario["section"] = response.css("div.rcx12 > small::text").get()
         diario["date"] = response.css('div[class*="rcx9"] div.rcx12 > small::text').get()
         diario["place"] = response.css("strong em::text").get()
-        diario["body"] = response.css('.rcx12#cuerpo_nota >p::text').extract()
+        #diario["body"] = response.css('.rcx12#cuerpo_nota >p::text').extract()
+        diario["body"] = '\n'.join(response.css('.rcx12#cuerpo_nota >p::text').getall())
         diario["img_link"] = response.css("figure > amp-img::attr(src)").get()
         
         target_date = "01 julio 2022" 
